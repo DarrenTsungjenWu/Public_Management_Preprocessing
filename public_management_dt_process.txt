@@ -1,0 +1,221 @@
+#Library
+library(rJava)  
+library(xlsxjars)
+library(xlsx)
+library(DMwR)
+library(mice)
+
+
+###Template for calculating PPP rate
+example = read.csv("D:\\PPPtest.csv")
+str(example)
+
+names(example) = c("Region", "Totalitem", "Final")
+str(example)
+
+f = c()
+for (i in 1:length(example$Region))
+{
+   l =  example$Final[i]/example$Totalitem[i]
+   f[i] = l
+}
+
+#Check the new column
+print(f)
+str(f)
+
+#Create a new data frame
+new_data = cbind(data, f)
+
+
+
+
+
+######################################Formal Work#####################################
+#Load variables data and preprocess 
+ppp = read.xlsx("D:\\選取變量\\PPPdata.xlsx", sheetIndex = 1, encoding = "UTF-8")
+GNP = read.xlsx("D:\\選取變量\\人均地區生產總值.xlsx",  sheetIndex = 1, encoding = "UTF-8")
+CPI = read.xlsx("D:\\選取變量\\CPI.xlsx",  sheetIndex = 1, encoding = "UTF-8")
+unstab = read.xlsx("D:\\選取變量\\政策不確定性.xlsx",  sheetIndex = 1, encoding = "UTF-8")
+corrupt = read.xlsx("D:\\選取變量\\政府貪腐度.xlsx",  sheetIndex = 1, encoding = "UTF-8")
+
+
+###Preprocessing
+##Compute "PPP落地率"
+ppp = read.xlsx("D:\\選取變量\\PPPdata.xlsx", sheetIndex = 1, encoding = "UTF-8")
+
+#check the form of data frame
+head(ppp)
+str(ppp)
+
+#Rename the the names of attributes in each column in case it cant be programed by Chinese
+names(ppp) = c("Region", "Year", "PPP_total", "FinalPPP")
+
+
+#Calculate "PPP落地率"
+f = c()
+for (i in 1:length(ppp$Year))
+{
+   l =  ppp$FinalPPP[i]/ppp$PPP_total[i]
+   f[i] = l
+}
+
+head(f)
+str(f) #check the form
+
+#Combind the new column with the original data frame
+ppp_new = cbind(ppp, f)
+
+#Rename the column of new data frame
+names(ppp_new) = c("Region", "Year", "PPP_total", "FinalPPP", "ratio")
+ppp_new$Region = as.factor(ppp_new$Region)
+
+
+#Save the data in csv file
+write.csv(ppp_new, "D:\\ppp_new.csv")
+
+
+
+
+'''
+Reg = c()
+Y = c()
+Ratio = c()
+pppdata_new = data.frame(
+   for(i in 1:length(Year))
+   {
+      r = ppp_new$Region[i]
+      Reg = c(r)
+   }
+
+   for(i in 1:length(Year))
+   {
+      y = ppp_new$Year[i]
+      Y = c(y)
+   }
+
+   for(i in 1:length(Year))
+   {
+      rr = ppp_new$Region[i]
+      Ratio = c(rr)
+   }
+
+   stringsAsFactors = "FALSE"
+)
+'''
+
+
+
+
+
+
+#Calculate "政府貪腐度"
+#colnames(corrupt[, 3:4]) = c("Corruption", "Population")
+names(corrupt) = c("Region", "Year", "Corruption", "Population")
+#The line above cant work so we use this form instead
+
+
+corruption_rate = c()
+
+for (i in 1:length(Year))
+{
+   if (is.na(corrupt[ ,3]) == "TURE") break
+   else (is.na(corrupt[ ,3] == "False"))
+   {
+      k = corrupt$Corruption[i]/corrupt$Population[i]
+   }
+   
+   corruption_rate[i] = k
+}
+
+head(corruption_rate)
+
+#Combine 2 data frame
+corrupt2 = cbind(corrupt[, 1:2], corruption_rate)
+
+#Save the data frame in csv file
+write.csv(corrupt2, "D:\\政府貪腐度.csv")
+
+#Choose the column we need in respective data frame
+
+
+
+
+###Solve for missing value
+#Load the new-built data
+ppp2 = read.csv("D:\\ppp_new.csv")
+corrupt2 = read.csv("D:\\政府貪腐度.csv")
+
+#Rename the name of columns we need of each data frame
+names(GNP) = c("No.", "Region", "Year", "GNP")
+names(CPI) = c("No.", "Region", "Year", "CPI")
+names(unstab) = c("Region", "Year", "Transform")
+
+#Remove the useless column
+GNP1 = GNP[, -1]
+CPI1 = CPI[, -1]
+
+
+
+'''
+GNP2 = c()
+for(i in 1:length(GNP$Year))
+{
+   if(GNP$Region == "天津市")
+   {
+   GNP2 = GNP[-i:i+4, ]
+   } else break
+GNP2[i] = G
+}
+'''
+
+#Form a wholly-integrated data frame
+df = cbind(ppp2[ ,-c(1, 4:5)], corrupt2$corruption_rate, GNP$GNP, CPI$CPI, unstab$Transform)
+
+
+
+#The final data frame
+df = read.xlsx("D:\\PPP_ana_temp.xlsx", sheetIndex =1, encoding = "UTF-8")
+
+
+
+### Estimate missing value
+#Check missing value
+md.pattern(df)
+#Implement KNN algorithms
+knnOutput <- knnImputation(df[-3]) #Take away ratio and calculate "corruption rate" in advance
+anyNA(knnOutput) #Check if there are missing values
+print(knnOutput) #The complete dataframe
+
+#Put back ratio and calculate complete its NA value
+knn1 = cbind(knnOutput, df$ratio)
+knnOutput2 = knnImputation(knn1)
+anyNA(knnOutput2)
+print(knnOutput2)
+#All the step is the same as above
+
+#Save the file as csv.
+write.csv(knnOutput2, "D:\\completeData.csv")
+
+
+
+#Do t-test to see if "before and after" are statistically the same each other
+#H0 = df$ - knnOutput2 = 0
+#H1 = df$ - knnOutput2 != 0
+t.test(df$ratio, knnOutput2[ ,7])
+t.test(df$corruption_rate, knnOutput2[ ,6])
+#Result: Significant
+
+
+###Note: We can do another trials 
+#like comparing KNN algorithms and means/modes approaches and so forth by forecast accuracy
+#We can also remove the 7th column(corruption rate) then 3rd(ratio) to see if there are differences in consequences
+#The reason why we are should do the test mentioned above is to choose the best algorithms fitting in our case
+#References: https://www.jamleecute.com/missing-value-treatment-%E9%81%BA%E5%A4%B1%E5%80%BC%E8%99%95%E7%90%86/
+
+
+
+
+
+
+
